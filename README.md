@@ -1,5 +1,9 @@
 # Insurance Claims SOP Agent
 
+Repository: https://github.com/zchen868/insurance-claims-sop-agent
+
+This submission provides a Docker-ready repository with setup instructions below. Configure your own AI model API token to run the natural-language demo.
+
 ## Reviewer setup and full-workflow demo
 
 Requires Docker Desktop (running) and an API token for a supported AI model provider.
