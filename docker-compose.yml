@@ -1,0 +1,13 @@
+# Local production-like run:  docker compose up --build   ->  http://localhost:8000
+services:
+  claims-agent:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    environment:
+      PUBLIC_BASE_URL: http://localhost:8000
+    volumes:
+      - agent-data:/data
+    restart: unless-stopped
+volumes:
+  agent-data:

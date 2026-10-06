@@ -1,0 +1,28 @@
+# Render Blueprint: New > Blueprint > pick this repo. Fill the "sync: false" secrets in the dashboard.
+services:
+  - type: web
+    name: claims-sop-agent
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/health
+    disk:
+      name: agent-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: AI_PROVIDER
+        value: deepseek
+      - key: AI_BASE_URL
+        value: https://api.deepseek.com
+      - key: AI_MODEL
+        value: deepseek-flash
+      - key: AI_API_FORMAT
+        value: responses
+      - key: AI_API_KEY
+        sync: false
+      - key: DEV_PASSWORD          # protects /dev (internals); the customer view /chat stays public
+        sync: false
+      - key: PUBLIC_BASE_URL       # e.g. https://claims-sop-agent.onrender.com (used in consent links)
+        sync: false
+      - key: SOP_TODAY
+        value: "2026-03-05"

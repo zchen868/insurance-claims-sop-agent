@@ -1,0 +1,29 @@
+# Fly.io:  fly launch --no-deploy  (keep this file)  ->  fly volumes create agent_data --size 1
+#          fly secrets set AI_API_KEY=... DEV_PASSWORD=... PUBLIC_BASE_URL=https://<app>.fly.dev  ->  fly deploy
+app = "claims-sop-agent"
+primary_region = "iad"
+
+[build]
+
+[env]
+  AI_PROVIDER = "deepseek"
+  AI_BASE_URL = "https://api.deepseek.com"
+  AI_MODEL = "deepseek-flash"
+  AI_API_FORMAT = "responses"
+  SOP_TODAY = "2026-03-05"
+
+[mounts]
+  source = "agent_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = "stop"
+  auto_start_machines = true
+  min_machines_running = 0
+  # One machine: sessions and lockout counters live in the SQLite volume.
+  [[http_service.checks]]
+    path = "/api/health"
+    interval = "30s"
+    timeout = "5s"

@@ -1,0 +1,7 @@
+.venv/
+outbox/
+__pycache__/
+.pytest_cache/
+.env
+data/
+evals/reports/report-*
