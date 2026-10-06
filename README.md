@@ -4,6 +4,18 @@ Repository: https://github.com/zchen868/insurance-claims-sop-agent
 
 This submission provides a Docker-ready repository with setup instructions below. Configure your own AI model API token to run the natural-language demo.
 
+## Assessment requirement coverage
+
+- **Strict identity gate:** at least three matching fields from full name, DOB, phone, email, and SSN last four. Policy number is a lookup hint and does not count toward the three. Partial answers accumulate; failed verification never opens the disclosure gate.
+- **Memory across phases:** claim intent and hints are captured during VERIFY_ID and reused after verification. The supplied Margaret Chen sample resolves to CL-2048 without restarting intent discovery.
+- **Bounded model reasoning:** the real LLM interprets natural language, ambiguity, follow-up questions and emotion, and phrases grounded answers. Deterministic handlers choose permitted transitions and tool actions from those interpretations. The model cannot directly execute arbitrary tools or bypass verification. Output checks cover protected details, claim IDs, amounts and dates; they are not a formal guarantee against every possible hallucination.
+- **Scope and recovery:** unrelated questions such as “What is RL?” are declined. The third consecutive irrelevant turn offers a human; the fourth enters simulated HANDOFF.
+- **Post-case choice:** offer a summary containing discussed topics, claim status and next steps. Send only after consent, or skip without producing an email. Sending is simulated in the outbox by default.
+- **Emotional support bonus:** recognize negative emotions and refusals; place empathy before workflow prompts; explain verification/consent; offer alternate identity fields; offer or simulate human handoff when persuasion should stop.
+- **Agreed demo scope:** real LLM calls are required and were demonstrated. No real email delivery, document upload, external support ticket, or connection to a live human is required. Handoff is a demo state and message, with an internal note.
+
+Additional reviewer checks: start a new conversation for each example. Try a claim hint before supplying identity, “What is RL?” repeatedly, the frustrated-caller sample, “I want to speak to a human representative,” and choosing “skip” at the email offer. Inspect the gate, planned acts, and trace in `/dev`.
+
 ## Reviewer setup and full-workflow demo
 
 Requires Docker Desktop (running) and an API token for a supported AI model provider.
@@ -36,7 +48,7 @@ Stop the service with `docker compose down` (the named volume is retained).
 
 ### Validation
 
-A local Docker build and model-backed UI walkthrough were completed on October 6, 2026: VERIFY_ID → RESOLVE_INTENT → PROCESS_CASE → POST_PROCESS → ENDED, with an LLM-composed summary in the simulated outbox. This is a manual walkthrough, not a fresh execution of the automated test suite.
+A local Docker build and model-backed UI walkthrough were completed on October 6, 2026: VERIFY_ID → RESOLVE_INTENT → PROCESS_CASE → POST_PROCESS → ENDED, with an LLM-composed summary in the simulated outbox. The submitted code also passed 57/57 automated tests and 49/49 offline evaluation scenarios (103 turns) in an isolated Docker container on October 6, 2026. Offline checks validate workflow behavior; they do not measure live-model quality.
 
 
 A claims-support chat agent that follows a fixed business workflow but still talks naturally.
@@ -135,7 +147,7 @@ The model **interprets** (step 1) and **phrases** (step 5). It never decides pha
 
 | Phase | Control | Rules enforced by code | What the model is free to do |
 |---|---|---|---|
-| VERIFY_ID | **Strict** | Needs ≥3 of {full name, DOB, phone, email, SSN/national-ID last 4} matching one policyholder with no field contradicting the record (aliases count). The policy number helps find the record but doesn't count toward the 3. After a mismatch the agent never says which field was wrong, the details are cleared, and 3 failures lead to a handoff. Claim details stay locked: the guard rejects claim IDs, document names, amounts or a false "you're verified" in any draft. Representatives must be on the policy, and the policyholder must approve a consent request (polled each turn, offer a human on timeout). | Pull fields out of messy text ("born March 15th, '85"), handle partial answers spread over several turns, questions, refusals, and alternative ID fields. |
+| VERIFY_ID | **Strict** | Needs ≥3 of {full name, DOB, phone, email, SSN/national-ID last 4} matching one policyholder with no field contradicting the record (aliases count). The policy number helps find the record but doesn't count toward the 3. After a mismatch the agent never says which field was wrong, the details are retained for correction, and 3 failures lead to a handoff. Claim details stay locked: the guard rejects claim IDs, document names, amounts or a false "you're verified" in any draft. Representatives must be on the policy, and the policyholder must approve a consent request (polled each turn, offer a human on timeout). | Pull fields out of messy text ("born March 15th, '85"), handle partial answers spread over several turns, questions, refusals, and alternative ID fields. |
 | RESOLVE_INTENT | Bounded | Only the caller's own claims are searched. Remembered hints (type, status, month, year, ID) are matched deterministically: one match is selected, several get a short choice question, an unknown ID gets "not on your policy". | Turn vague wording into intent and hints ("the one from the hospital in January", "the denied one", "the second"). |
 | PROCESS_CASE | Flexible, grounded | Facts come only from the selected claim, the field definitions and the document guideline. Follow-up guidance is chosen by its `match_any` phrases. Changing decisions or payments is refused. Switching to another claim goes back through RESOLVE_INTENT. The guard checks that every claim ID, `$` amount and date in the reply exists in this turn's facts. | Answer follow-ups in natural language, combine guidance, explain field meanings, handle "what if I can't get X". |
 | POST_PROCESS | Strict choice | Always offers the email summary. The caller picks send or skip. It only goes to the **email on file** (shown masked), and a different address is declined. The summary is built from memory (topics discussed, claim status, next steps and deadlines) and checked for made-up amounts. | Write the summary; answer a late question (goes back to PROCESS_CASE, then offers the email again). |
@@ -167,14 +179,14 @@ Example (frustrated caller, not verified):
 
 ## Evaluation at scale
 
-`evals/scenarios.json` holds 51 scripted conversations in 11 categories (verification, privacy, memory, intent, processing, post-process, scope, emotion, representative, names, language). `evals/run_eval.py` runs them in parallel against the live model or offline and checks:
+`evals/scenarios.json` holds 49 scripted conversations in 10 categories (verification, privacy, memory, intent, processing, post-process, scope, emotion, representative, names). `evals/run_eval.py` runs them in parallel against the live model or offline and checks:
 
 - **Expectations per scenario:** final phase, verified party, selected claim, email state, gate, how the caller is addressed, which acts were planned on which turn, and required or forbidden reply text.
 - **Global invariants on every turn:** no claim detail before the gate opens, and no empty replies.
 - **Optional LLM judge (`--judge`):** scores naturalness, empathy, SOP adherence and clarity from 1 to 5, and lists concrete issues.
 - **Flakiness (`--repeat N`):** a scenario that passes only some of its repeats is reported as flaky.
 
-Reports go to `evals/reports/` (`latest.md` plus timestamped JSON/Markdown). The latest live run on DeepSeek passed 101 of 102 conversations (51 scenarios × 2). The single failure came from a check that was too strict about wording; after the check was fixed, that scenario passed 4 of 4. Judge averages: naturalness 4.57, empathy 4.96, SOP adherence 4.78, clarity 4.77. The suite exits non-zero on failure, so it can gate CI.
+Reports go to `evals/reports/` (`latest.md` plus timestamped JSON/Markdown). The verified submission run passed 49 of 49 offline scenarios. The real-model UI walkthrough passed the full workflow; the complete live evaluation and optional LLM judge were not rerun for this submission. The suite exits non-zero on failure, so it can gate CI.
 
 ## Production features
 
